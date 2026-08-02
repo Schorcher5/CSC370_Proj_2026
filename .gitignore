@@ -1,6 +1,9 @@
 # generated mock data -- regenerate with test_util, don't commit it
 /data/*.csv
 
+# generated executables
+/build
+
 # environment variables
 .env
 
