@@ -1,6 +1,9 @@
 # generated mock data -- regenerate with test_util, don't commit it
 /data/*.csv
 
+# environment variables
+.env
+
 # node
 demography_api/node_modules/
 demography_api/.env

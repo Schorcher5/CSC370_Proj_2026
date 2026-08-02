@@ -1,0 +1,21 @@
+services:
+  db:
+    image: mysql:8.0
+    container_name: census_mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-devpassword}
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-census_demographics}
+    ports:
+      - "${DB_SPRT:-3306}:${DB_EPRT:-3306}"
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./mysql/schemas:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-uroot", "-p${MYSQL_ROOT_PASSWORD:-devpassword}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+volumes:
+  mysql_data:
+ 
