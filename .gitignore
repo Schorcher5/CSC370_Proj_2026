@@ -1,0 +1,12 @@
+# generated mock data -- regenerate with test_util, don't commit it
+/data/*.csv
+
+# node
+demography_api/node_modules/
+demography_api/.env
+
+# go
+test_util/mock_data/
+
+# editor/OS cruft
+.DS_Store
