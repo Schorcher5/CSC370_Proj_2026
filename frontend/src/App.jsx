@@ -1,5 +1,6 @@
 // frontend/src/App.jsx
 import { useState, useEffect } from 'react';
+import './App.css';
 
 export default function App() {
   const [user, setUser] = useState(null);
@@ -103,37 +104,39 @@ export default function App() {
   };
 
   return (
-    <div style={{ maxWidth: '750px', margin: '2rem auto', fontFamily: 'sans-serif' }}>
-      <h1>Demographics Platform — Simulation Lab</h1>
+    <div className="dashboard-container">
+      <header className="dashboard-header">
+        <h1>Demographics Platform — Simulation Lab</h1>
+      </header>
 
-      {statusMsg && <p style={{ padding: '0.75rem', background: '#e2e8f0', borderRadius: '4px' }}>{statusMsg}</p>}
+      {statusMsg && <div className="status-banner">{statusMsg}</div>}
 
       {!user ? (
-        <div style={{ border: '1px solid #ccc', padding: '1.5rem', borderRadius: '8px' }}>
+        <div className="card">
           <h2>{isRegistering ? 'Create Account' : 'User Login'}</h2>
           <form onSubmit={handleAuthSubmit}>
             {isRegistering && (
-              <div style={{ marginBottom: '1rem' }}>
-                <label>Username: </label>
-                <input type="text" value={username} onChange={(e) => setUsername(e.target.value)} required />
+              <div className="form-group">
+                <label>Username</label>
+                <input className="form-input" type="text" value={username} onChange={(e) => setUsername(e.target.value)} required />
               </div>
             )}
-            <div style={{ marginBottom: '1rem' }}>
-              <label>Email: </label>
-              <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
+            <div className="form-group">
+              <label>Email</label>
+              <input className="form-input" type="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
             </div>
-            <div style={{ marginBottom: '1rem' }}>
-              <label>Password: </label>
-              <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} required />
+            <div className="form-group">
+              <label>Password</label>
+              <input className="form-input" type="password" value={password} onChange={(e) => setPassword(e.target.value)} required />
             </div>
-            <button type="submit">{isRegistering ? 'Sign Up' : 'Log In'}</button>
+            <button className="btn-primary" type="submit">{isRegistering ? 'Sign Up' : 'Log In'}</button>
           </form>
 
           <p style={{ marginTop: '1rem' }}>
             {isRegistering ? 'Already registered?' : "Need an account?"}{' '}
             <button 
               onClick={() => { setIsRegistering(!isRegistering); setStatusMsg(''); }}
-              style={{ border: 'none', background: 'none', color: 'blue', cursor: 'pointer' }}
+              style={{ border: 'none', background: 'none', color: '#2563eb', cursor: 'pointer', fontWeight: '600' }}
             >
               {isRegistering ? 'Log In' : 'Sign Up'}
             </button>
@@ -141,52 +144,49 @@ export default function App() {
         </div>
       ) : (
         <div>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div className="user-bar">
             <p>Logged in as: <strong>{user?.username}</strong></p>
-            <button onClick={handleLogout}>Log Out</button>
+            <button className="btn-secondary" onClick={handleLogout}>Log Out</button>
           </div>
 
-          <hr />
-
-          <h3>Create New Demographic Simulation</h3>
-
-          <form onSubmit={handleSimulationSubmit} style={{ border: '1px solid #ddd', padding: '1.25rem', borderRadius: '6px' }}>
-            <div style={{ marginBottom: '0.75rem' }}>
-              <label style={{ display: 'block', fontWeight: 'bold' }}>Simulation Title:</label>
-              <input type="text" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="e.g. 10-Year BC Metro Growth Model" style={{ width: '100%', padding: '0.4rem' }} required />
-            </div>
-
-            <div style={{ marginBottom: '0.75rem' }}>
-              <label style={{ display: 'block', fontWeight: 'bold' }}>Target Subdivision / Region:</label>
-              <input type="text" value={subdivision} onChange={(e) => setSubdivision(e.target.value)} style={{ width: '100%', padding: '0.4rem' }} required />
-            </div>
-
-            <div style={{ display: 'flex', gap: '1rem', marginBottom: '0.75rem' }}>
-              <div style={{ flex: 1 }}>
-                <label style={{ display: 'block', fontWeight: 'bold' }}>Base Population:</label>
-                <input type="number" value={basePopulation} onChange={(e) => setBasePopulation(e.target.value)} style={{ width: '100%', padding: '0.4rem' }} required />
+          <div className="card">
+            <h3>Create New Demographic Simulation</h3>
+            <form onSubmit={handleSimulationSubmit}>
+              <div className="form-group">
+                <label>Simulation Title</label>
+                <input className="form-input" type="text" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="e.g. 10-Year BC Metro Growth Model" required />
               </div>
-              <div style={{ flex: 1 }}>
-                <label style={{ display: 'block', fontWeight: 'bold' }}>Annual Growth Rate (decimal):</label>
-                <input type="number" step="0.001" value={annualGrowthRate} onChange={(e) => setAnnualGrowthRate(e.target.value)} style={{ width: '100%', padding: '0.4rem' }} required />
+
+              <div className="form-group">
+                <label>Target Subdivision / Region</label>
+                <input className="form-input" type="text" value={subdivision} onChange={(e) => setSubdivision(e.target.value)} required />
               </div>
-              <div style={{ flex: 1 }}>
-                <label style={{ display: 'block', fontWeight: 'bold' }}>Horizon (Years):</label>
-                <input type="number" value={projectionYears} onChange={(e) => setProjectionYears(e.target.value)} style={{ width: '100%', padding: '0.4rem' }} required />
+
+              <div className="form-grid-3">
+                <div className="form-group">
+                  <label>Base Population</label>
+                  <input className="form-input" type="number" value={basePopulation} onChange={(e) => setBasePopulation(e.target.value)} required />
+                </div>
+                <div className="form-group">
+                  <label>Growth Rate (decimal)</label>
+                  <input className="form-input" type="number" step="0.001" value={annualGrowthRate} onChange={(e) => setAnnualGrowthRate(e.target.value)} required />
+                </div>
+                <div className="form-group">
+                  <label>Horizon (Years)</label>
+                  <input className="form-input" type="number" value={projectionYears} onChange={(e) => setProjectionYears(e.target.value)} required />
+                </div>
               </div>
-            </div>
 
-            <button type="submit" style={{ padding: '0.5rem 1rem', cursor: 'pointer' }}>Run & Save Simulation</button>
-          </form>
+              <button className="btn-primary" type="submit">Run & Save Simulation</button>
+            </form>
+          </div>
 
-          <hr style={{ margin: '2rem 0' }} />
-
-          <h3>Your Saved Simulations</h3>
-          {simulations.length === 0 ? (
-            <p>No simulations created yet.</p>
-          ) : (
-            <div>
-              {simulations.map((sim) => {
+          <div className="card">
+            <h3>Your Saved Simulations</h3>
+            {simulations.length === 0 ? (
+              <p>No simulations created yet.</p>
+            ) : (
+              simulations.map((sim) => {
                 let params = sim.parameters;
                 let results = sim.results;
 
@@ -198,19 +198,19 @@ export default function App() {
                 }
 
                 return (
-                  <div key={sim.simulation_id} style={{ border: '1px solid #e2e8f0', borderRadius: '6px', padding: '1rem', marginBottom: '1rem', background: '#fafafa' }}>
-                    <h4 style={{ margin: '0 0 0.5rem 0' }}>{sim.title}</h4>
-                    <p style={{ margin: '0 0 0.25rem 0', fontSize: '0.9rem' }}>
+                  <div key={sim.simulation_id} className="sim-card">
+                    <h4>{sim.title}</h4>
+                    <div className="sim-meta">
                       <strong>Region:</strong> {params?.subdivision} | <strong>Base Pop:</strong> {params?.base_population?.toLocaleString()} | <strong>Rate:</strong> {(params?.annual_growth_rate * 100).toFixed(1)}% / yr
-                    </p>
-                    <p style={{ margin: '0', color: '#059669', fontWeight: 'bold' }}>
+                    </div>
+                    <div className="sim-result">
                       Projected Pop ({params?.projection_years} yrs): {results?.projected_population?.toLocaleString()} (+{results?.growth_percentage})
-                    </p>
+                    </div>
                   </div>
                 );
-              })}
-            </div>
-          )}
+              })
+            )}
+          </div>
         </div>
       )}
     </div>
