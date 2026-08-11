@@ -1,5 +1,6 @@
 // frontend/src/App.jsx
 import { useState, useEffect } from 'react';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import './App.css';
 
 export default function App() {
@@ -19,8 +20,9 @@ export default function App() {
   const [annualGrowthRate, setAnnualGrowthRate] = useState('0.015');
   const [projectionYears, setProjectionYears] = useState('10');
 
-  // Saved Simulations List
+  // Saved Simulations & Active Chart Modal State
   const [simulations, setSimulations] = useState([]);
+  const [activeChartSim, setActiveChartSim] = useState(null);
 
   useEffect(() => {
     fetch('/api/me')
@@ -75,7 +77,6 @@ export default function App() {
     setSimulations([]);
   };
 
-  // Submit and Execute Simulation
   const handleSimulationSubmit = async (e) => {
     e.preventDefault();
     setStatusMsg('');
@@ -101,6 +102,29 @@ export default function App() {
     } catch (err) {
       setStatusMsg(err.message);
     }
+  };
+
+  // Helper to construct step-by-step projection data points for Recharts
+  const generateChartData = (sim) => {
+    let params = sim.parameters;
+    if (typeof params === 'string') {
+      try { params = JSON.parse(params); } catch (e) { params = {}; }
+    }
+
+    const basePop = parseInt(params.base_population) || 5000000;
+    const rate = parseFloat(params.annual_growth_rate) || 0.015;
+    const years = parseInt(params.projection_years) || 10;
+    const startYear = 2026;
+
+    const chartPoints = [];
+    for (let i = 0; i <= years; i++) {
+      const popVal = Math.round(basePop * Math.pow(1 + rate, i));
+      chartPoints.push({
+        year: startYear + i,
+        Population: popVal
+      });
+    }
+    return chartPoints;
   };
 
   return (
@@ -187,15 +211,8 @@ export default function App() {
               <p>No simulations created yet.</p>
             ) : (
               simulations.map((sim) => {
-                let params = sim.parameters;
-                let results = sim.results;
-
-                if (typeof params === 'string') {
-                  try { params = JSON.parse(params); } catch (e) { params = {}; }
-                }
-                if (typeof results === 'string') {
-                  try { results = JSON.parse(results); } catch (e) { results = {}; }
-                }
+                let params = typeof sim.parameters === 'string' ? JSON.parse(sim.parameters) : sim.parameters;
+                let results = typeof sim.results === 'string' ? JSON.parse(sim.results) : sim.results;
 
                 return (
                   <div key={sim.simulation_id} className="sim-card">
@@ -203,13 +220,42 @@ export default function App() {
                     <div className="sim-meta">
                       <strong>Region:</strong> {params?.subdivision} | <strong>Base Pop:</strong> {params?.base_population?.toLocaleString()} | <strong>Rate:</strong> {(params?.annual_growth_rate * 100).toFixed(1)}% / yr
                     </div>
-                    <div className="sim-result">
-                      Projected Pop ({params?.projection_years} yrs): {results?.projected_population?.toLocaleString()} (+{results?.growth_percentage})
+                    <div className="sim-actions">
+                      <span className="sim-result">
+                        Projected Pop ({params?.projection_years} yrs): {results?.projected_population?.toLocaleString()} (+{results?.growth_percentage})
+                      </span>
+                      <button className="btn-secondary" onClick={() => setActiveChartSim(sim)}>
+                        📊 Graph
+                      </button>
                     </div>
                   </div>
                 );
               })
             )}
+          </div>
+        </div>
+      )}
+
+      {/* POPUP GRAPH MODAL */}
+      {activeChartSim && (
+        <div className="modal-overlay" onClick={() => setActiveChartSim(null)}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h3>{activeChartSim.title} — Growth Trend</h3>
+              <button className="btn-secondary" onClick={() => setActiveChartSim(null)}>✕ Close</button>
+            </div>
+
+            <div style={{ width: '100%', height: 300 }}>
+              <ResponsiveContainer>
+                <LineChart data={generateChartData(activeChartSim)}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="year" />
+                  <YAxis tickFormatter={(val) => `${(val / 1000000).toFixed(2)}M`} />
+                  <Tooltip formatter={(value) => value.toLocaleString()} />
+                  <Line type="monotone" dataKey="Population" stroke="#2563eb" strokeWidth={3} dot={{ r: 4 }} />
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
           </div>
         </div>
       )}
