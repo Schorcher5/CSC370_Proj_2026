@@ -20,3 +20,4 @@ test_util/mock_data/
 
 # editor/OS cruft
 .DS_Store
+.vscode
