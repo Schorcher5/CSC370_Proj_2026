@@ -51,8 +51,8 @@ services:
 
   frontend:
     build:
-      context: ./frontend
-    container_name: demography_frontend
+      context: ./front_end
+    container_name: demography_front_end
     restart: unless-stopped
     depends_on:
       - demography_api
@@ -64,8 +64,8 @@ services:
     ports:
       - "${FRONTEND_PORT:-5173}:5173"
     volumes:
-      - ./frontend/src:/app/src
-      - ./frontend/index.html:/app/index.html
+      - ./front_end/src:/app/src
+      - ./front_end/index.html:/app/index.html
 
 volumes:
   mysql_data:
