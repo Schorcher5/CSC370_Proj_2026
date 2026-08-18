@@ -10,6 +10,10 @@
 # node
 demography_api/node_modules/
 demography_api/.env
+frontend/node_modules/
+frontend/.env
+frontend/dist/
+
 
 # go
 test_util/mock_data/
