@@ -10,12 +10,62 @@ services:
       - "${DB_SPRT:-3306}:${DB_EPRT:-3306}"
     volumes:
       - mysql_data:/var/lib/mysql
-      - ./mysql/schemas:/docker-entrypoint-initdb.d:ro
+      # Read access to the whole mysql/ tree (schemas, views, triggers,
+      # auth, transactions), plus one orchestrator script that runs the
+      # right files from it in the right order. MySQL's own init
+      # entrypoint only looks at files directly inside
+      # docker-entrypoint-initdb.d and does not recurse into
+      # subdirectories, so the folders themselves can't be mounted there
+      # directly -- see mysql/init-order.sh for why this order specifically.
+      - ./mysql:/mysql-src:ro
+      - ./mysql/init-order.sh:/docker-entrypoint-initdb.d/00-init.sh:ro
     healthcheck:
       test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-uroot", "-p${MYSQL_ROOT_PASSWORD:-devpassword}"]
       interval: 5s
       timeout: 5s
       retries: 10
+
+  demography_api:
+    build:
+      context: ./demography_api
+    container_name: demography_api
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      # DB_HOST is the service name, not localhost -- containers reach
+      # each other by service name on Docker's compose network. Port
+      # 3306 here is MySQL's port *inside* its own container, unrelated
+      # to the host-facing ${DB_SPRT}/${DB_EPRT} mapping above.
+      DB_HOST: db
+      DB_PORT: 3306
+      DB_USER: census_app
+      DB_PASSWORD: ${CENSUS_APP_PASSWORD:-change-this-password}
+      DB_NAME: ${MYSQL_DATABASE:-census_demographics}
+      JWT_SECRET: ${JWT_SECRET:-change-this-too}
+      FRONTEND_ORIGIN: http://localhost:${FRONTEND_PORT:-5173}
+      PORT: 3000
+    ports:
+      - "${API_PORT:-3000}:3000"
+
+  frontend:
+    build:
+      context: ./frontend
+    container_name: demography_frontend
+    restart: unless-stopped
+    depends_on:
+      - demography_api
+    environment:
+      # Same distinction as DB_HOST above: the Vite dev server's proxy
+      # runs inside this container and must reach the API by service
+      # name, not localhost.
+      API_PROXY_TARGET: http://demography_api:3000
+    ports:
+      - "${FRONTEND_PORT:-5173}:5173"
+    volumes:
+      - ./frontend/src:/app/src
+      - ./frontend/index.html:/app/index.html
+
 volumes:
   mysql_data:
- 
