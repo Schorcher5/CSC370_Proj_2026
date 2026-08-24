@@ -18,7 +18,7 @@ export default function App() {
   const [password, setPassword] = useState('');
   const [statusMsg, setStatusMsg] = useState('');
 
-  // Tab Selection
+  // Mode Selection
   const [activeTab, setActiveTab] = useState('sim');
 
   // Simulation Form States
@@ -36,6 +36,10 @@ export default function App() {
   // Saved Data & Modal State
   const [simulations, setSimulations] = useState([]);
   const [activeChartSim, setActiveChartSim] = useState(null);
+
+  // Visual Natural Join State (Select 2 simulations)
+  const [selectedForJoin, setSelectedForJoin] = useState([]);
+  const [activeJoinedVisual, setActiveJoinedVisual] = useState(null);
 
   useEffect(() => {
     fetch('/api/me')
@@ -144,19 +148,95 @@ export default function App() {
     await fetch('/api/logout', { method: 'POST' });
     setUser(null);
     setSimulations([]);
+    setSelectedForJoin([]);
   };
 
-  // Helper to render Recharts visualizations across all simulation types
+  // Toggle selection checkbox for joining
+  const handleToggleSelectForJoin = (simId) => {
+    if (selectedForJoin.includes(simId)) {
+      setSelectedForJoin(selectedForJoin.filter(id => id !== simId));
+    } else {
+      if (selectedForJoin.length >= 2) {
+        setSelectedForJoin([selectedForJoin[1], simId]); // keep the latest two
+      } else {
+        setSelectedForJoin([...selectedForJoin, simId]);
+      }
+    }
+  };
+
+  // -------------------------------------------------------------
+  // VISUAL NATURAL JOIN LOGIC
+  // -------------------------------------------------------------
+  const executeVisualJoin = () => {
+    if (selectedForJoin.length !== 2) {
+      setStatusMsg('Please check exactly 2 datasets to execute a visual join.');
+      return;
+    }
+
+    const simA = simulations.find(s => s.simulation_id === selectedForJoin[0]);
+    const simB = simulations.find(s => s.simulation_id === selectedForJoin[1]);
+
+    const paramsA = typeof simA.parameters === 'string' ? JSON.parse(simA.parameters) : simA.parameters;
+    const resultsA = typeof simA.results === 'string' ? JSON.parse(simA.results) : simA.results;
+    const paramsB = typeof simB.parameters === 'string' ? JSON.parse(simB.parameters) : simB.parameters;
+    const resultsB = typeof simB.results === 'string' ? JSON.parse(simB.results) : simB.results;
+
+    // Case 1: Join Time-Series on Natural Key: `year`
+    if (resultsA.time_series && resultsB.time_series) {
+      const mapB = new Map(resultsB.time_series.map(item => [item.year, item.simulated]));
+      
+      const joinedData = resultsA.time_series.map(itemA => ({
+        year: itemA.year,
+        [simA.title]: itemA.simulated,
+        [simB.title]: mapB.get(itemA.year) || null,
+        'Census Baseline': itemA.baseline
+      }));
+
+      setActiveJoinedVisual({
+        type: 'time_series_join',
+        title: `Natural Join (Key: year): "${simA.title}" ⨝ "${simB.title}"`,
+        simAName: simA.title,
+        simBName: simB.title,
+        data: joinedData
+      });
+      return;
+    }
+
+    // Case 2: Join Cohorts on Natural Key: `age_bracket`
+    const cohortsA = resultsA.cohort_breakdown || [];
+    const cohortsB = resultsB.cohort_breakdown || [];
+
+    if (cohortsA.length > 0 && cohortsB.length > 0) {
+      const mapB = new Map(cohortsB.map(i => [i.age_bracket, (i.male || 0) + (i.female || 0)]));
+      
+      const joinedData = cohortsA.map(itemA => ({
+        age_bracket: itemA.age_bracket,
+        [`${simA.title} (Total)`]: (itemA.male || 0) + (itemA.female || 0),
+        [`${simB.title} (Total)`]: mapB.get(itemA.age_bracket) || 0
+      }));
+
+      setActiveJoinedVisual({
+        type: 'cohort_join',
+        title: `Natural Join (Key: age_bracket): "${simA.title}" ⨝ "${simB.title}"`,
+        simAName: `${simA.title} (Total)`,
+        simBName: `${simB.title} (Total)`,
+        data: joinedData
+      });
+      return;
+    }
+
+    setStatusMsg('Selected datasets do not share a common schema attribute to natural join (requires matching time-series years or age brackets).');
+  };
+
+  // Helper to render single Recharts visual
   const renderSimulationChart = (sim) => {
     let params = typeof sim.parameters === 'string' ? JSON.parse(sim.parameters) : sim.parameters || {};
     let results = typeof sim.results === 'string' ? JSON.parse(sim.results) : sim.results || {};
 
     const type = params.sim_type || 'exponential_growth';
 
-    // 1. Exponential Growth Time-Series
     if (type === 'exponential_growth') {
       let data = results.time_series;
-
       if (!data || data.length === 0) {
         const basePop = Number(params.base_population || params.sample_size) || 5500000;
         const rate = parseFloat(params.annual_growth_rate || params.growth_rate) || 0.015;
@@ -190,7 +270,6 @@ export default function App() {
       );
     }
 
-    // 2. Wealth / Income Donut Chart
     if (type === 'wealth_distribution' && results.distribution_data) {
       return (
         <div style={{ width: '100%', height: 320 }}>
@@ -218,7 +297,6 @@ export default function App() {
       );
     }
 
-    // 3. Age & Gender Cohort Breakdown (Grouped Bar Chart)
     if (type === 'age_gender_cohort' && results.cohort_breakdown) {
       return (
         <div style={{ width: '100%', height: 320 }}>
@@ -237,7 +315,6 @@ export default function App() {
       );
     }
 
-    // 4. CSV Dataset Upload Chart (Both Age/Gender and Income Breakdown)
     if (type === 'csv_dataset') {
       return (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
@@ -291,7 +368,7 @@ export default function App() {
       );
     }
 
-    return <p style={{ padding: '1rem', color: '#64748b' }}>No chart visualization data available for this record.</p>;
+    return <p style={{ padding: '1rem', color: '#64748b' }}>No chart visualization data available.</p>;
   };
 
   return (
@@ -417,7 +494,7 @@ export default function App() {
                     type="text"
                     value={title}
                     onChange={(e) => setTitle(e.target.value)}
-                    placeholder="e.g. BC 2035 Horizon Model"
+                    placeholder="e.g. BC Aggressive Growth 2035"
                     required
                   />
                 </div>
@@ -511,8 +588,20 @@ export default function App() {
             </div>
           )}
 
+          {/* SIMULATION LIST WITH VISUAL JOIN SELECTION */}
           <div className="card">
-            <h3>Saved Simulations & Visualizations</h3>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+              <h3 style={{ margin: 0 }}>Saved Simulations & Visualizations</h3>
+              <button
+                className="btn-primary"
+                style={{ backgroundColor: selectedForJoin.length === 2 ? '#7c3aed' : '#94a3b8' }}
+                disabled={selectedForJoin.length !== 2}
+                onClick={executeVisualJoin}
+              >
+                ⨝ Execute Visual Natural Join ({selectedForJoin.length}/2 Selected)
+              </button>
+            </div>
+
             {simulations.length === 0 ? (
               <p>No records found.</p>
             ) : (
@@ -521,20 +610,38 @@ export default function App() {
                   typeof sim.parameters === 'string'
                     ? JSON.parse(sim.parameters)
                     : sim.parameters;
+                const isChecked = selectedForJoin.includes(sim.simulation_id);
+
                 return (
-                  <div key={sim.simulation_id} className="sim-card">
-                    <h4>{sim.title}</h4>
-                    <div className="sim-meta">
-                      Type: <strong>{params?.sim_type}</strong> | Region:{' '}
-                      <strong>{params?.subdivision || 'Custom CSV'}</strong>
-                    </div>
-                    <div className="sim-actions">
-                      <button
-                        className="btn-primary"
-                        onClick={() => setActiveChartSim(sim)}
-                      >
-                        📊 View Visual Chart
-                      </button>
+                  <div
+                    key={sim.simulation_id}
+                    className="sim-card"
+                    style={{ border: isChecked ? '2px solid #7c3aed' : '1px solid #e2e8f0' }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                        <input
+                          type="checkbox"
+                          checked={isChecked}
+                          onChange={() => handleToggleSelectForJoin(sim.simulation_id)}
+                          style={{ width: '18px', height: '18px', cursor: 'pointer' }}
+                        />
+                        <div>
+                          <h4 style={{ margin: 0 }}>{sim.title}</h4>
+                          <div className="sim-meta">
+                            Type: <strong>{params?.sim_type}</strong> | Region:{' '}
+                            <strong>{params?.subdivision || 'Custom CSV'}</strong>
+                          </div>
+                        </div>
+                      </div>
+                      <div className="sim-actions">
+                        <button
+                          className="btn-primary"
+                          onClick={() => setActiveChartSim(sim)}
+                        >
+                          📊 View Single Chart
+                        </button>
+                      </div>
                     </div>
                   </div>
                 );
@@ -544,20 +651,65 @@ export default function App() {
         </div>
       )}
 
-      {/* POPUP GRAPH MODAL */}
+      {/* SINGLE GRAPH MODAL */}
       {activeChartSim && (
         <div className="modal-overlay" onClick={() => setActiveChartSim(null)}>
           <div className="modal-content" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
               <h3>{activeChartSim.title}</h3>
-              <button
-                className="btn-secondary"
-                onClick={() => setActiveChartSim(null)}
-              >
-                ✕ Close
-              </button>
+              <button className="btn-secondary" onClick={() => setActiveChartSim(null)}>✕ Close</button>
             </div>
             {renderSimulationChart(activeChartSim)}
+          </div>
+        </div>
+      )}
+
+      {/* VISUAL NATURAL JOIN MODAL */}
+      {activeJoinedVisual && (
+        <div className="modal-overlay" onClick={() => setActiveJoinedVisual(null)}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '750px' }}>
+            <div className="modal-header">
+              <div>
+                <h3 style={{ margin: 0 }}>{activeJoinedVisual.title}</h3>
+                <small style={{ color: '#64748b' }}>Combined comparison rendering data merged across both scenario records</small>
+              </div>
+              <button className="btn-secondary" onClick={() => setActiveJoinedVisual(null)}>✕ Close</button>
+            </div>
+
+            {/* Time-Series Join Output */}
+            {activeJoinedVisual.type === 'time_series_join' && (
+              <div style={{ width: '100%', height: 340 }}>
+                <ResponsiveContainer width="100%" height="100%">
+                  <LineChart data={activeJoinedVisual.data} margin={{ top: 10, right: 30, left: 10, bottom: 5 }}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="year" />
+                    <YAxis tickFormatter={(v) => `${(v / 1e6).toFixed(1)}M`} />
+                    <Tooltip formatter={(v) => Number(v).toLocaleString()} />
+                    <Legend />
+                    <Line type="monotone" dataKey="Census Baseline" stroke="#94a3b8" strokeDasharray="4 4" />
+                    <Line type="monotone" dataKey={activeJoinedVisual.simAName} stroke="#2563eb" strokeWidth={3} dot={{ r: 4 }} />
+                    <Line type="monotone" dataKey={activeJoinedVisual.simBName} stroke="#10b981" strokeWidth={3} dot={{ r: 4 }} />
+                  </LineChart>
+                </ResponsiveContainer>
+              </div>
+            )}
+
+            {/* Cohort Breakdown Join Output */}
+            {activeJoinedVisual.type === 'cohort_join' && (
+              <div style={{ width: '100%', height: 340 }}>
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={activeJoinedVisual.data} margin={{ top: 10, right: 30, left: 10, bottom: 5 }}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="age_bracket" />
+                    <YAxis tickFormatter={(v) => `${(v / 1e3).toFixed(0)}k`} />
+                    <Tooltip formatter={(v) => Number(v).toLocaleString()} />
+                    <Legend />
+                    <Bar dataKey={activeJoinedVisual.simAName} fill="#3b82f6" />
+                    <Bar dataKey={activeJoinedVisual.simBName} fill="#10b981" />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            )}
           </div>
         </div>
       )}
